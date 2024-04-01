@@ -45,3 +45,17 @@ variable "private_subnet_ids" {
   description = "Subnets for the application instances."
   type        = list(string)
 }
+
+variable "allowed_ingress_cidrs" {
+  description = "IPv4 CIDR blocks allowed to reach the load balancer."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+# --- Application -----------------------------------------------------------
+
+variable "app_port" {
+  description = "Port the application listens on."
+  type        = number
+  default     = 8080
+}
