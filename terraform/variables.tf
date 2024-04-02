@@ -59,3 +59,15 @@ variable "app_port" {
   type        = number
   default     = 8080
 }
+
+variable "health_check_path" {
+  description = "Path the load balancer uses for target health checks."
+  type        = string
+  default     = "/health"
+}
+
+variable "deregistration_delay" {
+  description = "Seconds the load balancer waits for in-flight requests before deregistering a target."
+  type        = number
+  default     = 30
+}
