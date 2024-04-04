@@ -1,0 +1,38 @@
+#!/bin/bash
+# Bootstraps an application instance. Rendered by Terraform's templatefile().
+set -euo pipefail
+
+APP_PORT="${app_port}"
+APP_VERSION="${app_version}"
+
+useradd --system --home-dir /opt/app --shell /sbin/nologin app || true
+mkdir -p /opt/app/current /var/log/app
+
+cat > /opt/app/current/server.py <<'PYEOF'
+${app_source}
+PYEOF
+
+chown -R app:app /opt/app /var/log/app
+
+cat > /etc/systemd/system/app.service <<UNIT
+[Unit]
+Description=Demo web application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=app
+Group=app
+WorkingDirectory=/opt/app/current
+Environment=APP_PORT=$APP_PORT
+Environment=APP_VERSION=$APP_VERSION
+ExecStart=/usr/bin/python3 /opt/app/current/server.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now app

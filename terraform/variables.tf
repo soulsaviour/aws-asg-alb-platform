@@ -71,3 +71,64 @@ variable "deregistration_delay" {
   type        = number
   default     = 30
 }
+
+variable "app_version" {
+  description = "Version string reported by the application."
+  type        = string
+  default     = "0.1.0"
+}
+
+# --- Compute ---------------------------------------------------------------
+
+variable "architecture" {
+  description = "CPU architecture for the fleet: x86_64, or arm64 for Graviton."
+  type        = string
+  default     = "x86_64"
+
+  validation {
+    condition     = contains(["x86_64", "arm64"], var.architecture)
+    error_message = "architecture must be x86_64 or arm64."
+  }
+}
+
+variable "instance_type" {
+  description = "Instance type. Defaults to t3.small (x86_64) or t4g.small (arm64)."
+  type        = string
+  default     = null
+}
+
+variable "ami_id" {
+  description = "Pin a specific AMI. Defaults to the latest Amazon Linux 2023 image."
+  type        = string
+  default     = null
+}
+
+variable "root_volume_size" {
+  description = "Root EBS volume size in GiB."
+  type        = number
+  default     = 20
+}
+
+variable "detailed_monitoring" {
+  description = "Enable 1-minute EC2 metrics, which makes scaling react faster."
+  type        = bool
+  default     = true
+}
+
+variable "asg_min_size" {
+  description = "Minimum number of instances."
+  type        = number
+  default     = 2
+}
+
+variable "asg_max_size" {
+  description = "Maximum number of instances."
+  type        = number
+  default     = 6
+}
+
+variable "asg_desired_capacity" {
+  description = "Initial number of instances. Scaling policies manage it afterwards."
+  type        = number
+  default     = 2
+}
