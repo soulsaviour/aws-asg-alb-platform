@@ -132,3 +132,17 @@ variable "asg_desired_capacity" {
   type        = number
   default     = 2
 }
+
+# --- Scaling ---------------------------------------------------------------
+
+variable "cpu_target_value" {
+  description = "Average CPU utilisation (%) the Auto Scaling group aims for."
+  type        = number
+  default     = 60
+}
+
+variable "requests_per_target" {
+  description = "ALB requests per minute per instance to aim for. 0 disables request-based scaling."
+  type        = number
+  default     = 0
+}
