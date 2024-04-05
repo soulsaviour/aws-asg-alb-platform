@@ -4,6 +4,9 @@ set -euo pipefail
 
 APP_PORT="${app_port}"
 APP_VERSION="${app_version}"
+CW_CONFIG_PARAMETER="${cloudwatch_config_parameter}"
+
+dnf install -y amazon-cloudwatch-agent logrotate
 
 useradd --system --home-dir /opt/app --shell /sbin/nologin app || true
 mkdir -p /opt/app/current /var/log/app
@@ -29,10 +32,27 @@ Environment=APP_VERSION=$APP_VERSION
 ExecStart=/usr/bin/python3 /opt/app/current/server.py
 Restart=on-failure
 RestartSec=2
+StandardOutput=append:/var/log/app/app.log
+StandardError=inherit
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
+cat > /etc/logrotate.d/app <<'ROTATE'
+/var/log/app/app.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+ROTATE
+
 systemctl daemon-reload
 systemctl enable --now app
+
+# Metrics and logs to CloudWatch, using the config Terraform keeps in SSM.
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s -c "ssm:$CW_CONFIG_PARAMETER"

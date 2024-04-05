@@ -25,3 +25,8 @@ resource "aws_iam_instance_profile" "app" {
   name_prefix = "${local.name}-app-"
   role        = aws_iam_role.app.name
 }
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.app.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+}

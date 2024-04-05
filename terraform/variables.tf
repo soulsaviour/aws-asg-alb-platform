@@ -146,3 +146,29 @@ variable "requests_per_target" {
   type        = number
   default     = 0
 }
+
+# --- Observability ---------------------------------------------------------
+
+variable "log_retention_days" {
+  description = "Retention for the application and bootstrap log groups."
+  type        = number
+  default     = 30
+}
+
+variable "alarm_sns_topic_arn" {
+  description = "SNS topic to notify on alarm state changes. Leave null to create alarms without actions."
+  type        = string
+  default     = null
+}
+
+variable "target_5xx_threshold" {
+  description = "Number of target 5xx responses in 5 minutes that raises the alarm."
+  type        = number
+  default     = 10
+}
+
+variable "memory_alarm_threshold" {
+  description = "Fleet-average memory use (%) that raises the alarm."
+  type        = number
+  default     = 85
+}

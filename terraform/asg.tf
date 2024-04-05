@@ -7,9 +7,10 @@ resource "aws_launch_template" "app" {
   update_default_version = true
 
   user_data = base64encode(templatefile("${path.module}/templates/user_data.sh.tftpl", {
-    app_port    = var.app_port
-    app_version = var.app_version
-    app_source  = file("${path.module}/../app/server.py")
+    app_port                    = var.app_port
+    app_version                 = var.app_version
+    app_source                  = file("${path.module}/../app/server.py")
+    cloudwatch_config_parameter = aws_ssm_parameter.cloudwatch_agent.name
   }))
 
   iam_instance_profile {
