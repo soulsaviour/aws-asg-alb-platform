@@ -1,4 +1,4 @@
-# Load balancer: accepts HTTP from the allowed networks and only talks to the
+# Load balancer: accepts HTTP(S) from the allowed networks and only talks to the
 # application instances on the app port.
 
 resource "aws_security_group" "alb" {
@@ -24,6 +24,17 @@ resource "aws_vpc_security_group_ingress_rule" "alb_http" {
   ip_protocol       = "tcp"
   from_port         = 80
   to_port           = 80
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_https" {
+  for_each = local.https_enabled ? toset(var.allowed_ingress_cidrs) : toset([])
+
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTPS from ${each.value}"
+  cidr_ipv4         = each.value
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
 }
 
 resource "aws_vpc_security_group_egress_rule" "alb_to_app" {

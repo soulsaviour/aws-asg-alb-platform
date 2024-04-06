@@ -172,3 +172,17 @@ variable "memory_alarm_threshold" {
   type        = number
   default     = 85
 }
+
+# --- TLS -------------------------------------------------------------------
+
+variable "certificate_arn" {
+  description = "ACM certificate for the HTTPS listener. When null, the ALB serves plain HTTP only."
+  type        = string
+  default     = null
+}
+
+variable "ssl_policy" {
+  description = "TLS policy for the HTTPS listener."
+  type        = string
+  default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+}
