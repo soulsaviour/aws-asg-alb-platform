@@ -71,6 +71,18 @@ resource "aws_vpc_security_group_ingress_rule" "app_from_alb" {
   to_port                      = var.app_port
 }
 
+# SSH for the Ansible deploy, only from the networks you list (bastion, VPN).
+resource "aws_vpc_security_group_ingress_rule" "app_ssh" {
+  for_each = toset(var.ssh_ingress_cidrs)
+
+  security_group_id = aws_security_group.app.id
+  description       = "SSH from ${each.value}"
+  cidr_ipv4         = each.value
+  ip_protocol       = "tcp"
+  from_port         = 22
+  to_port           = 22
+}
+
 resource "aws_vpc_security_group_egress_rule" "app_all" {
   security_group_id = aws_security_group.app.id
   description       = "Outbound for package installs, SSM and CloudWatch"

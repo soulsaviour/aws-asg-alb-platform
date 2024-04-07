@@ -1,3 +1,8 @@
+output "region" {
+  description = "Region the stack is deployed in."
+  value       = var.region
+}
+
 output "alb_dns_name" {
   description = "Public DNS name of the load balancer."
   value       = aws_lb.this.dns_name

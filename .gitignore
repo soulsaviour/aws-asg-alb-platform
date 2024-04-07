@@ -26,3 +26,6 @@ build/
 .idea/
 .vscode/
 .DS_Store
+
+# Generated from terraform output
+ansible/group_vars/all/terraform.yml

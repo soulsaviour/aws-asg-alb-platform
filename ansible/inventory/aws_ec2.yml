@@ -1,0 +1,18 @@
+---
+# Dynamic inventory of the running app fleet. Needs boto3 and AWS credentials.
+# Adjust the region and tags if you changed project/environment in Terraform.
+plugin: amazon.aws.aws_ec2
+regions:
+  - ap-south-1
+filters:
+  instance-state-name: running
+  tag:Project: webapp
+  tag:Environment: dev
+  tag:Role: app
+hostnames:
+  - instance-id
+compose:
+  ansible_host: private_ip_address
+groups:
+  # Everything the filters match is an app server.
+  app: "true"

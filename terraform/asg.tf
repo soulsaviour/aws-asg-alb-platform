@@ -3,6 +3,7 @@ resource "aws_launch_template" "app" {
   description            = "Application instances for ${local.name}"
   image_id               = local.ami_id
   instance_type          = local.instance_type
+  key_name               = var.ssh_key_name
   vpc_security_group_ids = [aws_security_group.app.id]
   update_default_version = true
 

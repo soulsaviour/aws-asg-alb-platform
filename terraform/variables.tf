@@ -186,3 +186,17 @@ variable "ssl_policy" {
   type        = string
   default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
 }
+
+# --- Access ----------------------------------------------------------------
+
+variable "ssh_key_name" {
+  description = "EC2 key pair for SSH, used by the Ansible deploy. Null launches instances without one."
+  type        = string
+  default     = null
+}
+
+variable "ssh_ingress_cidrs" {
+  description = "CIDR blocks allowed to SSH to the instances, e.g. a bastion subnet or VPN range."
+  type        = list(string)
+  default     = []
+}

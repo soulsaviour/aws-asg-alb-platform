@@ -1,0 +1,11 @@
+---
+# Instances live in private subnets; reach them through a bastion or VPN.
+ansible_user: ec2-user
+# ansible_ssh_common_args: "-o ProxyJump=ec2-user@bastion.example.com"
+
+app_port: 8080
+app_health_path: /health
+app_root: /opt/app
+
+# aws_region, asg_name, target_group_arn, artifact_bucket and version_parameter
+# come from Terraform: run scripts/export-terraform-outputs.sh after an apply.
