@@ -16,9 +16,20 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+
+def read_version():
+    """Release version, from the VERSION file packaged next to this script."""
+    version_file = Path(__file__).resolve().parent / "VERSION"
+    try:
+        return version_file.read_text().strip()
+    except OSError:
+        return os.environ.get("APP_VERSION", "dev")
+
 
 PORT = int(os.environ.get("APP_PORT", "8080"))
-VERSION = os.environ.get("APP_VERSION", "dev")
+VERSION = read_version()
 HOSTNAME = socket.gethostname()
 STARTED_AT = time.time()
 

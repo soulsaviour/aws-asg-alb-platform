@@ -30,3 +30,23 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
   role       = aws_iam_role.app.name
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
+
+data "aws_iam_policy_document" "app_releases" {
+  statement {
+    sid       = "ReadReleases"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.artifacts.arn}/releases/*"]
+  }
+
+  statement {
+    sid       = "ReadCurrentVersion"
+    actions   = ["ssm:GetParameter"]
+    resources = [aws_ssm_parameter.app_version.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "app_releases" {
+  name_prefix = "releases-"
+  role        = aws_iam_role.app.id
+  policy      = data.aws_iam_policy_document.app_releases.json
+}

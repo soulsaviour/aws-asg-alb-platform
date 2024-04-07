@@ -7,9 +7,10 @@ resource "aws_launch_template" "app" {
   update_default_version = true
 
   user_data = base64encode(templatefile("${path.module}/templates/user_data.sh.tftpl", {
+    region                      = var.region
     app_port                    = var.app_port
-    app_version                 = var.app_version
-    app_source                  = file("${path.module}/../app/server.py")
+    artifact_bucket             = aws_s3_bucket.artifacts.id
+    version_parameter           = aws_ssm_parameter.app_version.name
     cloudwatch_config_parameter = aws_ssm_parameter.cloudwatch_agent.name
   }))
 
@@ -58,8 +59,9 @@ resource "aws_autoscaling_group" "app" {
   target_group_arns   = [aws_lb_target_group.app.arn]
 
   # Replace instances that fail the ALB health check, not just EC2 status checks.
+  # The grace period covers bootstrap, including waiting for a first release.
   health_check_type         = "ELB"
-  health_check_grace_period = 180
+  health_check_grace_period = 300
   default_instance_warmup   = 120
 
   launch_template {

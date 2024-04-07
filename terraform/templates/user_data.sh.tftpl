@@ -2,19 +2,39 @@
 # Bootstraps an application instance. Rendered by Terraform's templatefile().
 set -euo pipefail
 
+REGION="${region}"
 APP_PORT="${app_port}"
-APP_VERSION="${app_version}"
+ARTIFACT_BUCKET="${artifact_bucket}"
+VERSION_PARAMETER="${version_parameter}"
 CW_CONFIG_PARAMETER="${cloudwatch_config_parameter}"
 
 dnf install -y amazon-cloudwatch-agent logrotate
 
 useradd --system --home-dir /opt/app --shell /sbin/nologin app || true
-mkdir -p /opt/app/current /var/log/app
+mkdir -p /opt/app/releases /var/log/app
 
-cat > /opt/app/current/server.py <<'PYEOF'
-${app_source}
-PYEOF
+# Install whichever release the version parameter points at. On a brand-new
+# stack the first release may not be published yet, so keep retrying for a bit.
+for attempt in $(seq 1 30); do
+  VERSION=$(aws ssm get-parameter --region "$REGION" --name "$VERSION_PARAMETER" \
+    --query Parameter.Value --output text)
+  if aws s3 cp --region "$REGION" --only-show-errors \
+    "s3://$ARTIFACT_BUCKET/releases/app-$VERSION.tar.gz" /tmp/app.tar.gz; then
+    break
+  fi
+  echo "release $VERSION not available yet (attempt $attempt/30), retrying in 10s"
+  sleep 10
+done
 
+if [ ! -s /tmp/app.tar.gz ]; then
+  echo "no release could be downloaded, giving up" >&2
+  exit 1
+fi
+
+mkdir -p "/opt/app/releases/$VERSION"
+tar -xzf /tmp/app.tar.gz -C "/opt/app/releases/$VERSION"
+ln -sfn "/opt/app/releases/$VERSION" /opt/app/current
+rm -f /tmp/app.tar.gz
 chown -R app:app /opt/app /var/log/app
 
 cat > /etc/systemd/system/app.service <<UNIT
@@ -28,7 +48,6 @@ User=app
 Group=app
 WorkingDirectory=/opt/app/current
 Environment=APP_PORT=$APP_PORT
-Environment=APP_VERSION=$APP_VERSION
 ExecStart=/usr/bin/python3 /opt/app/current/server.py
 Restart=on-failure
 RestartSec=2

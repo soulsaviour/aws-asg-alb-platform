@@ -32,3 +32,13 @@ output "cloudwatch_agent_config_parameter" {
   description = "SSM parameter holding the CloudWatch agent configuration."
   value       = aws_ssm_parameter.cloudwatch_agent.name
 }
+
+output "artifact_bucket" {
+  description = "S3 bucket that holds release tarballs."
+  value       = aws_s3_bucket.artifacts.id
+}
+
+output "version_parameter" {
+  description = "SSM parameter pointing at the current release."
+  value       = aws_ssm_parameter.app_version.name
+}

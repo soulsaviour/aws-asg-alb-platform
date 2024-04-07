@@ -72,8 +72,8 @@ variable "deregistration_delay" {
   default     = 30
 }
 
-variable "app_version" {
-  description = "Version string reported by the application."
+variable "initial_release_version" {
+  description = "Release the version parameter starts at. Publish it right after the first apply."
   type        = string
   default     = "0.1.0"
 }
