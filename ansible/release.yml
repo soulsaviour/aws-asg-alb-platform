@@ -1,0 +1,67 @@
+---
+# Packages app/ into releases/app-<version>.tar.gz in the artifact bucket.
+# Publishing doesn't change what's running; deploy.yml does that.
+#
+#   ansible-playbook release.yml -e release_version=1.2.0
+
+- name: Publish an application release
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    app_src: "{{ playbook_dir }}/../app"
+    build_dir: "{{ playbook_dir }}/../build"
+    stage_dir: "{{ build_dir }}/app-{{ release_version }}"
+    artifact_key: "releases/app-{{ release_version }}.tar.gz"
+    artifact_path: "{{ build_dir }}/app-{{ release_version }}.tar.gz"
+
+  tasks:
+    - name: Check the release version
+      ansible.builtin.assert:
+        that:
+          - release_version is defined
+          - release_version is match('^[0-9A-Za-z][0-9A-Za-z._-]*$')
+        fail_msg: "Pass a version, e.g. -e release_version=1.2.0"
+        quiet: true
+
+    - name: Look for an existing release with this version
+      amazon.aws.s3_object:
+        bucket: "{{ artifact_bucket }}"
+        mode: list
+        prefix: "{{ artifact_key }}"
+        region: "{{ aws_region }}"
+      register: existing_release
+
+    - name: Refuse to overwrite a published release
+      ansible.builtin.fail:
+        msg: "{{ artifact_key }} already exists. Releases are immutable, so bump the version."
+      when: artifact_key in existing_release.s3_keys
+
+    - name: Stage application files
+      ansible.builtin.copy:
+        src: "{{ app_src }}/"
+        dest: "{{ stage_dir }}/"
+        mode: preserve
+
+    - name: Stamp the version
+      ansible.builtin.copy:
+        content: "{{ release_version }}\n"
+        dest: "{{ stage_dir }}/VERSION"
+        mode: "0644"
+
+    - name: Build the tarball
+      community.general.archive:
+        path: "{{ stage_dir }}/*"
+        dest: "{{ artifact_path }}"
+        format: gz
+        mode: "0644"
+
+    - name: Upload the release
+      amazon.aws.s3_object:
+        bucket: "{{ artifact_bucket }}"
+        object: "{{ artifact_key }}"
+        src: "{{ artifact_path }}"
+        mode: put
+        overwrite: never
+        region: "{{ aws_region }}"
