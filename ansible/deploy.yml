@@ -10,8 +10,11 @@
 #    health locally, put back, wait until the ALB sees it healthy.
 # 4. Resumes the ASG processes.
 #
-# If a run stops part-way, run it again with the same version: instances that
-# already have it are skipped. resume_asg.yml resumes the ASG on its own.
+# If the new release fails its health checks on an instance, that instance is
+# rolled back, the version parameter is pointed back at the previous release,
+# the ASG is resumed and the run stops. If a run dies for another reason, run
+# it again with the same version (updated instances are skipped), or run
+# resume_asg.yml to hand control back to the ASG.
 
 - name: Prepare the rollout
   hosts: localhost

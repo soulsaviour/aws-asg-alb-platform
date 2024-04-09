@@ -8,87 +8,149 @@
   ansible.builtin.meta: end_host
   when: (app_release_current.stat.lnk_target | default('') | basename) == release_version
 
-- name: Take the instance out of the target group
-  ansible.builtin.command: >-
-    aws elbv2 deregister-targets --region {{ aws_region }}
-    --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
-  delegate_to: localhost
-  become: false
-  changed_when: true
+- name: Install and verify the release
+  block:
+    - name: Take the instance out of the target group
+      ansible.builtin.command: >-
+        aws elbv2 deregister-targets --region {{ aws_region }}
+        --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
+      delegate_to: localhost
+      become: false
+      changed_when: true
 
-- name: Wait for in-flight requests to drain
-  ansible.builtin.command: >-
-    aws elbv2 wait target-deregistered --region {{ aws_region }}
-    --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
-  delegate_to: localhost
-  become: false
-  changed_when: false
+    - name: Wait for in-flight requests to drain
+      ansible.builtin.command: >-
+        aws elbv2 wait target-deregistered --region {{ aws_region }}
+        --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
+      delegate_to: localhost
+      become: false
+      changed_when: false
 
-- name: Download the release
-  ansible.builtin.command: >-
-    aws s3 cp --only-show-errors --region {{ aws_region }}
-    s3://{{ artifact_bucket }}/releases/app-{{ release_version }}.tar.gz
-    /tmp/app-{{ release_version }}.tar.gz
-  args:
-    creates: /tmp/app-{{ release_version }}.tar.gz
+    - name: Download the release
+      ansible.builtin.command: >-
+        aws s3 cp --only-show-errors --region {{ aws_region }}
+        s3://{{ artifact_bucket }}/releases/app-{{ release_version }}.tar.gz
+        /tmp/app-{{ release_version }}.tar.gz
+      args:
+        creates: /tmp/app-{{ release_version }}.tar.gz
 
-- name: Create the release directory
-  ansible.builtin.file:
-    path: "{{ app_root }}/releases/{{ release_version }}"
-    state: directory
-    owner: app
-    group: app
-    mode: "0755"
+    - name: Create the release directory
+      ansible.builtin.file:
+        path: "{{ app_root }}/releases/{{ release_version }}"
+        state: directory
+        owner: app
+        group: app
+        mode: "0755"
 
-- name: Unpack the release
-  ansible.builtin.unarchive:
-    src: /tmp/app-{{ release_version }}.tar.gz
-    dest: "{{ app_root }}/releases/{{ release_version }}"
-    remote_src: true
-    owner: app
-    group: app
+    - name: Unpack the release
+      ansible.builtin.unarchive:
+        src: /tmp/app-{{ release_version }}.tar.gz
+        dest: "{{ app_root }}/releases/{{ release_version }}"
+        remote_src: true
+        owner: app
+        group: app
 
-- name: Switch to the new release
-  ansible.builtin.file:
-    src: "{{ app_root }}/releases/{{ release_version }}"
-    dest: "{{ app_root }}/current"
-    state: link
+    - name: Switch to the new release
+      ansible.builtin.file:
+        src: "{{ app_root }}/releases/{{ release_version }}"
+        dest: "{{ app_root }}/current"
+        state: link
 
-- name: Restart the application
-  ansible.builtin.systemd_service:
-    name: app
-    state: restarted
+    - name: Restart the application
+      ansible.builtin.systemd_service:
+        name: app
+        state: restarted
 
-- name: Wait for the local health check
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ app_port }}{{ app_health_path }}"
-  register: app_release_health
-  until: app_release_health.status == 200
-  retries: "{{ app_release_health_retries }}"
-  delay: "{{ app_release_health_delay }}"
+    - name: Wait for the local health check
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ app_port }}{{ app_health_path }}"
+      register: app_release_health
+      until: app_release_health.status == 200
+      retries: "{{ app_release_health_retries }}"
+      delay: "{{ app_release_health_delay }}"
 
-- name: Check the instance serves the new release
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ app_port }}/"
-    return_content: true
-  register: app_release_root
-  failed_when: app_release_root.json.version | default('') != release_version
+    - name: Check the instance serves the new release
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ app_port }}/"
+        return_content: true
+      register: app_release_root
+      failed_when: app_release_root.json.version | default('') != release_version
 
-- name: Put the instance back in the target group
-  ansible.builtin.command: >-
-    aws elbv2 register-targets --region {{ aws_region }}
-    --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
-  delegate_to: localhost
-  become: false
-  changed_when: true
+    - name: Put the instance back in the target group
+      ansible.builtin.command: >-
+        aws elbv2 register-targets --region {{ aws_region }}
+        --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
+      delegate_to: localhost
+      become: false
+      changed_when: true
 
-- name: Wait until the ALB reports the instance healthy
-  ansible.builtin.command: >-
-    aws elbv2 wait target-in-service --region {{ aws_region }}
-    --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
-  delegate_to: localhost
-  become: false
-  changed_when: false
+    - name: Wait until the ALB reports the instance healthy
+      ansible.builtin.command: >-
+        aws elbv2 wait target-in-service --region {{ aws_region }}
+        --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
+      delegate_to: localhost
+      become: false
+      changed_when: false
+
+  rescue:
+    - name: Roll back to the previous release
+      ansible.builtin.file:
+        src: "{{ app_release_current.stat.lnk_target }}"
+        dest: "{{ app_root }}/current"
+        state: link
+      when: app_release_current.stat.lnk_target is defined
+
+    - name: Restart the previous release
+      ansible.builtin.systemd_service:
+        name: app
+        state: restarted
+      when: app_release_current.stat.lnk_target is defined
+
+    - name: Wait for the previous release to come back
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ app_port }}{{ app_health_path }}"
+      register: app_release_rollback_health
+      until: app_release_rollback_health.status == 200
+      retries: "{{ app_release_health_retries }}"
+      delay: "{{ app_release_health_delay }}"
+
+    - name: Return the instance to the target group
+      ansible.builtin.command: >-
+        aws elbv2 register-targets --region {{ aws_region }}
+        --target-group-arn {{ target_group_arn }} --targets Id={{ instance_id }}
+      delegate_to: localhost
+      become: false
+      changed_when: true
+
+    - name: Point the version parameter back at the previous release
+      ansible.builtin.command: >-
+        aws ssm put-parameter --region {{ aws_region }}
+        --name {{ version_parameter }}
+        --value {{ app_release_current.stat.lnk_target | basename }}
+        --type String --overwrite
+      delegate_to: localhost
+      become: false
+      run_once: true
+      changed_when: true
+      when: app_release_current.stat.lnk_target is defined
+
+    - name: Resume ASG processes
+      ansible.builtin.command: >-
+        aws autoscaling resume-processes --region {{ aws_region }}
+        --auto-scaling-group-name {{ asg_name }}
+        --scaling-processes {{ asg_suspended_processes | join(' ') }}
+      delegate_to: localhost
+      become: false
+      run_once: true
+      changed_when: true
+
+    - name: Stop the rollout
+      ansible.builtin.fail:
+        msg: >-
+          {{ release_version }} failed on {{ inventory_hostname }}, which was rolled
+          back to {{ app_release_current.stat.lnk_target | default('?') | basename }}.
+          Instances in earlier batches still run {{ release_version }}; deploy the
+          previous version to bring them back, or fix forward.
 
 - name: Remove the downloaded tarball
   ansible.builtin.file:
