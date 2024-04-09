@@ -1,0 +1,78 @@
+---
+# Rolling deploy of a published release across the Auto Scaling group.
+#
+#   ansible-playbook deploy.yml -e release_version=1.2.0
+#
+# 1. Checks the release exists and points the SSM version parameter at it, so
+#    any instance the ASG launches mid-rollout boots the new release.
+# 2. Suspends the ASG processes that would fight the rollout.
+# 3. Updates instances in batches: drain from the target group, install, check
+#    health locally, put back, wait until the ALB sees it healthy.
+# 4. Resumes the ASG processes.
+#
+# If a run stops part-way, run it again with the same version: instances that
+# already have it are skipped. resume_asg.yml resumes the ASG on its own.
+
+- name: Prepare the rollout
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Check the release version
+      ansible.builtin.assert:
+        that:
+          - release_version is defined
+        fail_msg: "Pass a version, e.g. -e release_version=1.2.0"
+        quiet: true
+
+    - name: Check the release has been published
+      amazon.aws.s3_object:
+        bucket: "{{ artifact_bucket }}"
+        mode: list
+        prefix: "releases/app-{{ release_version }}.tar.gz"
+        region: "{{ aws_region }}"
+      register: published_release
+      failed_when: ('releases/app-' ~ release_version ~ '.tar.gz') not in published_release.s3_keys
+
+    - name: Point the version parameter at the new release
+      ansible.builtin.command: >-
+        aws ssm put-parameter --region {{ aws_region }}
+        --name {{ version_parameter }} --value {{ release_version }}
+        --type String --overwrite
+      changed_when: true
+
+    - name: Suspend ASG processes for the rollout
+      ansible.builtin.command: >-
+        aws autoscaling suspend-processes --region {{ aws_region }}
+        --auto-scaling-group-name {{ asg_name }}
+        --scaling-processes {{ asg_suspended_processes | join(' ') }}
+      changed_when: true
+
+- name: Roll the release across the fleet
+  hosts: app
+  # Play keywords can't see group_vars, so the default lives here.
+  # Override with -e deploy_batch_size=2 (or "25%").
+  vars:
+    deploy_batch_size: 1
+  serial: "{{ deploy_batch_size }}"
+  max_fail_percentage: 0
+  any_errors_fatal: true
+  gather_facts: false
+  become: true
+
+  roles:
+    - role: app_release
+
+- name: Hand control back to the ASG
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Resume ASG processes
+      ansible.builtin.command: >-
+        aws autoscaling resume-processes --region {{ aws_region }}
+        --auto-scaling-group-name {{ asg_name }}
+        --scaling-processes {{ asg_suspended_processes | join(' ') }}
+      changed_when: true

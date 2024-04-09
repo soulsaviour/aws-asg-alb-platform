@@ -9,3 +9,11 @@ app_root: /opt/app
 
 # aws_region, asg_name, target_group_arn, artifact_bucket and version_parameter
 # come from Terraform: run scripts/export-terraform-outputs.sh after an apply.
+
+# Rolling deploy (batch size is set in deploy.yml)
+asg_suspended_processes:
+  - HealthCheck # a drained, restarting instance must not be marked unhealthy...
+  - ReplaceUnhealthy # ...or replaced mid-deploy
+  - AZRebalance
+  - AlarmNotification # no scaling while the fleet is mixed
+  - ScheduledActions

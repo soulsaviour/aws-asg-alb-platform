@@ -1,0 +1,16 @@
+---
+# Resumes the ASG processes that deploy.yml suspends. Only needed when a
+# deploy stopped part-way through.
+
+- name: Resume Auto Scaling processes
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Resume ASG processes
+      ansible.builtin.command: >-
+        aws autoscaling resume-processes --region {{ aws_region }}
+        --auto-scaling-group-name {{ asg_name }}
+        --scaling-processes {{ asg_suspended_processes | join(' ') }}
+      changed_when: true

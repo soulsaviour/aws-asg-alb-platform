@@ -1,0 +1,7 @@
+---
+# How long to wait for the app to answer its health check after a restart.
+app_release_health_retries: 20
+app_release_health_delay: 3
+
+# Releases kept on disk for quick rollbacks.
+app_release_keep: 3
