@@ -1,0 +1,70 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.17.1
+      - name: Format
+        run: terraform fmt -check -recursive
+      - name: Init
+        run: terraform init -backend=false -input=false
+      - name: Validate
+        run: terraform validate -no-color
+
+  ansible:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install tooling
+        run: |
+          pip install ansible-core ansible-lint boto3
+          ansible-galaxy collection install -r requirements.yml
+      - name: Syntax check
+        run: |
+          for playbook in release.yml deploy.yml resume_asg.yml; do
+            ansible-playbook "$playbook" --syntax-check -e release_version=0.0.0
+          done
+      - name: Lint
+        run: ansible-lint
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Shell scripts
+        run: bash -n scripts/*.sh
+      - name: Smoke test
+        run: |
+          echo "0.0.0-ci" > app/VERSION
+          APP_PORT=8080 python app/server.py &
+          for _ in $(seq 1 20); do curl -fs localhost:8080/health && break; sleep 0.5; done
+          curl -fs localhost:8080/ | python -c '
+          import json, sys
+          version = json.load(sys.stdin)["version"]
+          assert version == "0.0.0-ci", version
+          print("serving", version)
+          '
