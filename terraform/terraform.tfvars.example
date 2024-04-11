@@ -5,3 +5,13 @@ environment = "dev"
 vpc_id             = "vpc-0123456789abcdef0"
 public_subnet_ids  = ["subnet-aaaa1111", "subnet-bbbb2222"]
 private_subnet_ids = ["subnet-cccc3333", "subnet-dddd4444"]
+
+# Needed for the Ansible deploy: a key pair, and where SSH may come from.
+ssh_key_name      = "deploy"
+ssh_ingress_cidrs = ["10.0.0.0/24"] # bastion subnet or VPN range
+
+# Optional
+# architecture        = "arm64" # Graviton, defaults to t4g.small
+# certificate_arn     = "arn:aws:acm:ap-south-1:123456789012:certificate/..."
+# alarm_sns_topic_arn = "arn:aws:sns:ap-south-1:123456789012:alerts"
+# requests_per_target = 1000
